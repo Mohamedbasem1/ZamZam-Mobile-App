@@ -90,11 +90,10 @@ class _MainPageState extends State<MainPage> {
                   _onItemTapped(index, category: category)),
           ProductsPage(
             selectedCategory: _selectedCategory,
-            onNavigate: (index) =>
-                _onItemTapped(index), // Pass the navigation callback
+            onNavigate: (index) => _onItemTapped(index),
           ),
-          _isLoggedIn ? WishlistPage() : WelcomePage(),
-          _isLoggedIn ? CartPage() : WelcomePage(),
+          _isLoggedIn ? WishlistPage(onNavigate: (index) => _onItemTapped(index)) : WelcomePage(),
+          _isLoggedIn ? CartPage(onNavigate: (index) => _onItemTapped(index)) : WelcomePage(),
           _isLoggedIn ? ProfilePage() : WelcomePage(),
         ],
       ),

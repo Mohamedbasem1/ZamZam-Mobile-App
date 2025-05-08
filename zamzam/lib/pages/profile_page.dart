@@ -198,6 +198,36 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     ],
                   ),
+                  
+                  // Admin Section (only visible for admin users)
+                  FutureBuilder<bool>(
+                    future: _checkIfAdmin(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data == true) {
+                        return _buildSection(
+                          title: 'Admin Tools',
+                          children: [
+                            _buildActionTile(
+                              icon: Icons.admin_panel_settings,
+                              title: 'Admin Dashboard',
+                              onTap: () {
+                                Navigator.of(context).pushNamed('/admin');
+                              },
+                            ),
+                            _buildActionTile(
+                              icon: Icons.sync,
+                              title: 'Sync Products',
+                              onTap: () {
+                                Navigator.of(context).pushNamed('/admin');
+                              },
+                            ),
+                          ],
+                        );
+                      } else {
+                        return SizedBox.shrink();
+                      }
+                    },
+                  ),
 
                   // App Settings
                   _buildSection(
@@ -321,5 +351,27 @@ class _ProfilePageState extends State<ProfilePage> {
       return '${ts.day.toString().padLeft(2, '0')}/${ts.month.toString().padLeft(2, '0')}/${ts.year}';
     }
     return ts.toString();
+  }
+
+  Future<bool> _checkIfAdmin() async {
+    try {
+      // For development purposes, always return true to access admin features
+      // In production, you should implement proper admin role checking
+      return true;
+      
+      // Example of proper implementation:
+      // final user = _firebaseService.currentUser;
+      // if (user == null) return false;
+      // 
+      // DocumentSnapshot userDoc = await FirebaseFirestore.instance
+      //     .collection('users')
+      //     .doc(user.uid)
+      //     .get();
+      // 
+      // return userDoc.exists && userDoc.get('isAdmin') == true;
+    } catch (e) {
+      print('Error checking admin status: $e');
+      return false;
+    }
   }
 }

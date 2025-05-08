@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import '../services/api_services.dart';
+import '../services/product_firebase_service.dart';
 import '../services/firebase_service.dart';
-import '../services/cart_service.dart'; // Add this import
-import '../constants/image_constants.dart'; // Add this import
+import '../services/cart_service.dart';
+import '../constants/image_constants.dart';
+import '../services/api_services.dart' show Product;
+import '../services/favorite_service.dart';
+import '../widgets/quantity_selector.dart';
+import '../widgets/product_detail_dialog.dart';
 
 class HomePage extends StatefulWidget {
   final Function(int, {String? category})? onNavigate;
@@ -16,6 +20,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentCarouselIndex = 0;
   final PageController _pageController = PageController();
+  final ProductFirebaseService _productService = ProductFirebaseService();
+  final CartService _cartService = CartService();
+  final FavoriteService _favoriteService = FavoriteService();
+  final FirebaseService _firebaseService = FirebaseService();
 
   final List<Map<String, dynamic>> _banners = ImageConstants.banners;
 
@@ -27,8 +35,8 @@ class _HomePageState extends State<HomePage> {
     {'name': 'Pilot', 'icon': Icons.auto_awesome, 'color': Color(0xFF985EFF)},
   ];
 
-  final CartService _cartService = CartService();
   int _cartItemCount = 0;
+  int _selectedQuantity = 1;
 
   @override
   void initState() {
@@ -63,50 +71,53 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.school, color: Theme.of(context).colorScheme.primary),
-            SizedBox(width: 8),
-            Text(
-              'Zamzam',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+        title: Text('Zamzam'),
         actions: [
-          IconButton(
-            icon: Icon(Icons.account_circle),
-            onPressed: () {
-              // If we have a navigation callback and the user is logged in, use it
-              if (widget.onNavigate != null && FirebaseService().isLoggedIn) {
-                widget.onNavigate!(4); // Navigate to profile tab (index 4)
-              } else if (!FirebaseService().isLoggedIn) {
-                // Navigate to login if not logged in
-                Navigator.of(context).pushNamed('/welcome');
-              }
-            },
-          ),
-          IconButton(
-            icon: Icon(Icons.notifications_none),
-            onPressed: () {},
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: Icon(Icons.shopping_bag_outlined),
+                onPressed: () {
+                  if (widget.onNavigate != null) {
+                    widget.onNavigate!(3);
+                  } else {
+                    Navigator.pushNamed(context, '/cart');
+                  }
+                },
+              ),
+              if (_cartItemCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.error,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      _cartItemCount.toString(),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
-        leading: IconButton(
-          icon: Icon(Icons.menu),
-          onPressed: () {},
-        ),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        centerTitle: true,
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          // Simulate refresh
-          await Future.delayed(Duration(seconds: 1));
+          // Refresh featured products
           setState(() {});
         },
         child: SingleChildScrollView(
@@ -138,105 +149,83 @@ class _HomePageState extends State<HomePage> {
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(vertical: 15),
                     ),
+                    onTap: () {
+                      // Navigate to browse tab when search is tapped
+                      if (widget.onNavigate != null) {
+                        widget.onNavigate!(1);
+                      }
+                    },
+                    readOnly: true, // Make it non-editable
                   ),
                 ),
 
                 // Banner Carousel
                 AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: Stack(
-                    children: [
-                      PageView.builder(
-                        controller: _pageController,
-                        itemCount: _banners.length,
-                        onPageChanged: (index) {
-                          setState(() {
-                            _currentCarouselIndex = index;
-                          });
-                        },
-                        itemBuilder: (context, index) {
-                          final banner = _banners[index];
-                          return Container(
-                            width: MediaQuery.of(context).size.width,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              image: DecorationImage(
-                                image: NetworkImage(banner['image']),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            child: Container(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Stack(
+                      children: [
+                        PageView.builder(
+                          controller: _pageController,
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentCarouselIndex = index;
+                            });
+                          },
+                          itemCount: _banners.length,
+                          itemBuilder: (context, index) {
+                            return Container(
+                              margin: EdgeInsets.symmetric(horizontal: 4),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Colors.black.withOpacity(0.7),
-                                  ],
+                                image: DecorationImage(
+                                  image: AssetImage(_banners[index]['image']),
+                                  fit: BoxFit.cover,
                                 ),
                               ),
-                              padding: EdgeInsets.all(16),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    banner['title'],
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    banner['subtitle'],
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      // Custom page indicator
-                      Positioned(
-                        bottom: 16,
-                        right: 16,
-                        child: Row(
-                          children: List.generate(
-                            _banners.length,
-                            (index) => Container(
-                              width: 8,
-                              height: 8,
-                              margin: EdgeInsets.only(left: 4),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _currentCarouselIndex == index
-                                    ? Colors.white
-                                    : Colors.white.withOpacity(0.5),
+                            );
+                          },
+                        ),
+                        Positioned(
+                          bottom: 16,
+                          left: 0,
+                          right: 0,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              _banners.length,
+                              (index) => Container(
+                                width: 8,
+                                height: 8,
+                                margin: EdgeInsets.symmetric(horizontal: 4),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _currentCarouselIndex == index
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Colors.grey.withOpacity(0.5),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 
                 SizedBox(height: 24),
 
-                // Categories Section
+                // Categories
                 Text(
                   'Categories',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
+
                 SizedBox(height: 16),
+
                 Container(
                   height: 100,
                   child: ListView.builder(
@@ -302,10 +291,8 @@ class _HomePageState extends State<HomePage> {
                       onPressed: () {
                         // Navigate to Browse/Products page
                         if (widget.onNavigate != null) {
-                          // If we have a callback for tab navigation, use it (preferred approach)
-                          widget.onNavigate!(1); // Index 1 is the Browse tab
+                          widget.onNavigate!(1);
                         } else {
-                          // Fallback: Navigate using Navigator
                           Navigator.pushNamed(context, '/products');
                         }
                       },
@@ -322,9 +309,9 @@ class _HomePageState extends State<HomePage> {
 
                 SizedBox(height: 16),
 
-                // Real product data from API
+                // Featured products from Firebase
                 FutureBuilder<List<Product>>(
-                  future: ApiService.getFeaturedProducts(),
+                  future: _productService.getFeaturedProducts(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return Center(
@@ -336,7 +323,7 @@ class _HomePageState extends State<HomePage> {
                       );
                     } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                       return Center(
-                        child: Text('No products available'),
+                        child: Text('No featured products available'),
                       );
                     }
 
@@ -347,7 +334,7 @@ class _HomePageState extends State<HomePage> {
                       physics: NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
-                        childAspectRatio: 0.7,
+                        childAspectRatio: 0.75,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
                       ),
@@ -368,117 +355,247 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildProductCard(Product product) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 2),
+    return GestureDetector(
+      onTap: () {
+        // Show product details dialog
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => ProductDetailDialog(
+            product: product,
+            onNavigate: widget.onNavigate,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Product Image
-          Expanded(
-            child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                  child: Image.network(
-                    product.image,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Center(
-                        child: Icon(Icons.image_not_supported,
-                            color: Colors.grey)),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Product Image
+            Expanded(
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Image.network(
+                      product.image,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Center(
+                          child: Icon(Icons.image_not_supported,
+                              color: Colors.grey)),
+                    ),
                   ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 4,
-                          offset: Offset(0, 2),
+                  if (product.stockCount == 0)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Out of Stock',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Row(
+                      children: [
+                        if (product.isFeatured)
+                          Container(
+                            margin: EdgeInsets.only(right: 8),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Featured',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                        StreamBuilder<List<Product>>(
+                          stream: _favoriteService.getFavoriteProductsStream(),
+                          builder: (context, snapshot) {
+                            bool isFavorite = false;
+                            if (snapshot.hasData) {
+                              isFavorite = snapshot.data!.any((p) => p.docId == product.docId);
+                            }
+                            
+                            return GestureDetector(
+                              onTap: () async {
+                                if (!_firebaseService.isLoggedIn) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Please login to add to favorites'),
+                                      behavior: SnackBarBehavior.floating,
+                                      action: SnackBarAction(
+                                        label: 'LOGIN',
+                                        onPressed: () {
+                                          // Navigate to login page
+                                          Navigator.pushNamed(context, '/login');
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                
+                                try {
+                                  await _favoriteService.toggleFavorite(product);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        isFavorite
+                                            ? 'Removed from favorites'
+                                            : 'Added to favorites',
+                                      ),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to update favorites'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Container(
+                                padding: EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 4,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  isFavorite ? Icons.favorite : Icons.favorite_border,
+                                  size: 20,
+                                  color: isFavorite ? Colors.red : Colors.grey,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
-                    child: Icon(
-                      Icons.favorite_border,
-                      size: 18,
-                      color: Colors.grey,
-                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // Product Info
-          Padding(
-            padding: EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+            // Product Info
+            Padding(
+              padding: EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.star,
-                      size: 14,
-                      color: Color(0xFFFFC107),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      '${product.rating.toStringAsFixed(1)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                  SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.star,
+                        size: 14,
+                        color: Color(0xFFFFC107),
                       ),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      '(${product.ratingCount})',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
+                      SizedBox(width: 4),
+                      Text(
+                        '${product.rating.toStringAsFixed(1)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Text(
-                  product.price,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Theme.of(context).colorScheme.primary,
+                      SizedBox(width: 4),
+                      Text(
+                        '(${product.ratingCount})',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.price,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: product.stockCount > 0 ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          product.stockCount > 0 ? 'In Stock' : 'Out',
+                          style: TextStyle(
+                            color: product.stockCount > 0 ? Colors.green : Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

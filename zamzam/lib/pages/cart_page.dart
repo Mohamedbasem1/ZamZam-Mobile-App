@@ -1,125 +1,120 @@
 import 'package:flutter/material.dart';
-
-class CartItem {
-  final String id;
-  final String name;
-  final String image;
-  final double price;
-  int quantity;
-
-  CartItem({
-    required this.id,
-    required this.name,
-    required this.image,
-    required this.price,
-    this.quantity = 1,
-  });
-}
+import '../services/cart_service.dart';
+import '../services/firebase_service.dart';
+import '../widgets/quantity_selector.dart';
 
 class CartPage extends StatefulWidget {
+  final Function(int)? onNavigate;
+
+  const CartPage({this.onNavigate});
+
   @override
   _CartPageState createState() => _CartPageState();
 }
 
 class _CartPageState extends State<CartPage> {
-  // Dummy cart items for demonstration
-  List<CartItem> _cartItems = [
-    CartItem(
-      id: '1',
-      name: 'Premium Notebook',
-      image:
-          'https://images.unsplash.com/photo-1517842645767-c639042777db?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-      price: 29.99,
-    ),
-    CartItem(
-      id: '2',
-      name: 'Gel Pen Set (12 Colors)',
-      image:
-          'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-      price: 39.99,
-      quantity: 2,
-    ),
-    CartItem(
-      id: '3',
-      name: 'Canvas Backpack',
-      image:
-          'https://images.unsplash.com/photo-1565717233170-42a43b1f8587?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-      price: 129.99,
-    ),
-  ];
+  final CartService _cartService = CartService();
+  final FirebaseService _firebaseService = FirebaseService();
+  bool _isLoading = false;
 
-  double _calculateTotal() {
-    return _cartItems.fold(
-        0, (total, item) => total + (item.price * item.quantity));
-  }
-
-  void _updateQuantity(int index, int newQuantity) {
-    if (newQuantity < 1) return;
-    setState(() {
-      _cartItems[index].quantity = newQuantity;
-    });
-  }
-
-  void _removeItem(int index) {
-    setState(() {
-      _cartItems.removeAt(index);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Item removed from cart'),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        margin: EdgeInsets.all(10),
-      ),
-    );
+  // Helper method to parse price string
+  double _parsePrice(String price) {
+    try {
+      // Remove 'EGP' and any other non-numeric characters except decimal point
+      String cleanPrice = price.replaceAll('EGP', '').replaceAll(RegExp(r'[^0-9.]'), '');
+      return double.parse(cleanPrice);
+    } catch (e) {
+      print('Error parsing price: $e');
+      return 0.0;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_firebaseService.isLoggedIn) {
+      return _buildLoginPrompt();
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Your Cart'),
         actions: [
-          if (_cartItems.isNotEmpty)
-            IconButton(
-              icon: Icon(Icons.delete_outline),
-              onPressed: () {
-                // Show confirmation dialog
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text('Clear Cart'),
-                    content: Text(
-                        'Are you sure you want to remove all items from your cart?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _cartItems.clear();
-                          });
-                          Navigator.pop(context);
-                        },
-                        child: Text('Clear'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+          StreamBuilder<List<CartItem>>(
+            stream: _cartService.getCartItemsStream(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData || snapshot.data!.isEmpty) return SizedBox();
+              return IconButton(
+                icon: Icon(Icons.delete_outline),
+                onPressed: () => _showClearCartDialog(),
+              );
+            },
+          ),
         ],
       ),
-      body: _cartItems.isEmpty ? _buildEmptyCart() : _buildCartList(),
-      bottomNavigationBar: _cartItems.isEmpty ? null : _buildCheckoutSection(),
+      body: StreamBuilder<List<CartItem>>(
+        stream: _cartService.getCartItemsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Error loading cart: ${snapshot.error}'),
+            );
+          }
+
+          final cartItems = snapshot.data ?? [];
+          if (cartItems.isEmpty) {
+            return _buildEmptyCart();
+          }
+
+          return _buildCartList(cartItems);
+        },
+      ),
+      bottomNavigationBar: StreamBuilder<List<CartItem>>(
+        stream: _cartService.getCartItemsStream(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData || snapshot.data!.isEmpty) return SizedBox.shrink();
+          return _buildCheckoutSection(snapshot.data!);
+        },
+      ),
+    );
+  }
+
+  Widget _buildLoginPrompt() {
+    return Scaffold(
+      appBar: AppBar(title: Text('Your Cart')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.shopping_cart_outlined,
+              size: 64,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Please login to view your cart',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/login');
+              },
+              child: Text('Login'),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -154,8 +149,9 @@ class _CartPageState extends State<CartPage> {
           SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () {
-              // Navigate to products page
-              Navigator.of(context).pop();
+              if (widget.onNavigate != null) {
+                widget.onNavigate!(1); // Navigate to browse page
+              }
             },
             icon: Icon(Icons.shopping_bag_outlined),
             label: Text('Browse Products'),
@@ -168,14 +164,14 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildCartList() {
+  Widget _buildCartList(List<CartItem> items) {
     return ListView.builder(
       padding: EdgeInsets.all(16),
-      itemCount: _cartItems.length,
+      itemCount: items.length,
       itemBuilder: (context, index) {
-        final item = _cartItems[index];
+        final item = items[index];
         return Dismissible(
-          key: Key(item.id),
+          key: Key(item.productId),
           direction: DismissDirection.endToStart,
           background: Container(
             padding: EdgeInsets.symmetric(horizontal: 20),
@@ -190,34 +186,8 @@ class _CartPageState extends State<CartPage> {
               size: 30,
             ),
           ),
-          onDismissed: (direction) {
-            _removeItem(index);
-          },
-          confirmDismiss: (direction) async {
-            return await showDialog(
-              context: context,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  title: Text('Remove Item'),
-                  content: Text(
-                      'Are you sure you want to remove this item from your cart?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: Text('Remove'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
+          onDismissed: (direction) => _removeItem(item.productId),
+          confirmDismiss: (direction) => _showRemoveItemDialog(),
           child: Card(
             margin: EdgeInsets.only(bottom: 16),
             shape: RoundedRectangleBorder(
@@ -240,8 +210,7 @@ class _CartPageState extends State<CartPage> {
                         width: 100,
                         height: 100,
                         color: Colors.grey[200],
-                        child:
-                            Icon(Icons.image_not_supported, color: Colors.grey),
+                        child: Icon(Icons.image_not_supported, color: Colors.grey),
                       ),
                     ),
                   ),
@@ -258,97 +227,43 @@ class _CartPageState extends State<CartPage> {
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 8),
+                        SizedBox(height: 4),
                         Text(
-                          'EGP ${item.price.toStringAsFixed(2)}',
+                          'EGP ${_parsePrice(item.price).toStringAsFixed(2)}',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).primaryColor,
+                            fontWeight: FontWeight.w600,
                             fontSize: 16,
                           ),
                         ),
-                        SizedBox(height: 16),
-
-                        // Quantity Controls
-                        Row(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              child: Row(
-                                children: [
-                                  // Decrease Button
-                                  GestureDetector(
-                                    onTap: () => _updateQuantity(
-                                        index, item.quantity - 1),
-                                    child: Container(
-                                      padding: EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        border: Border(
-                                          right: BorderSide(
-                                              color: Colors.grey[300]!),
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        Icons.remove,
-                                        size: 16,
-                                        color: item.quantity > 1
-                                            ? Colors.black
-                                            : Colors.grey,
-                                      ),
-                                    ),
-                                  ),
-
-                                  // Quantity Display
-                                  Container(
-                                    padding:
-                                        EdgeInsets.symmetric(horizontal: 12),
-                                    child: Text(
-                                      '${item.quantity}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-
-                                  // Increase Button
-                                  GestureDetector(
-                                    onTap: () => _updateQuantity(
-                                        index, item.quantity + 1),
-                                    child: Container(
-                                      padding: EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        border: Border(
-                                          left: BorderSide(
-                                              color: Colors.grey[300]!),
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        Icons.add,
-                                        size: 16,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            Spacer(),
-
-                            // Subtotal
-                            Text(
-                              'EGP ${(item.price * item.quantity).toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+                        SizedBox(height: 8),
+                        QuantitySelector(
+                          quantity: item.quantity,
+                          onChanged: (value) => _updateQuantity(
+                            item.productId,
+                            value,
+                          ),
+                          backgroundColor: Colors.grey[100],
                         ),
                       ],
                     ),
+                  ),
+
+                  // Total Price
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'EGP ${(_parsePrice(item.price) * item.quantity).toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -359,21 +274,24 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildCheckoutSection() {
-    final subtotal = _calculateTotal();
-    final shipping = 25.0; // Fixed shipping cost
-    final total = subtotal + shipping;
+  Widget _buildCheckoutSection(List<CartItem> items) {
+    double subtotal = items.fold(
+      0.0,
+      (total, item) =>
+          total + (_parsePrice(item.price) * item.quantity),
+    );
+    double shipping = 25.00;
+    double total = subtotal + shipping;
 
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, -5),
+            offset: Offset(0, -4),
+            blurRadius: 8,
           ),
         ],
       ),
@@ -381,7 +299,6 @@ class _CartPageState extends State<CartPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Order Summary
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -403,9 +320,7 @@ class _CartPageState extends State<CartPage> {
                 ),
               ],
             ),
-            SizedBox(height: 8),
-            Divider(),
-            SizedBox(height: 8),
+            Divider(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -421,27 +336,153 @@ class _CartPageState extends State<CartPage> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: Theme.of(context).primaryColor,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 20),
-
-            // Checkout Button
-            ElevatedButton(
-              onPressed: () {
-                // Navigate to checkout page
-                Navigator.pushNamed(context, '/payment');
-              },
-              child: Text('Proceed to Checkout'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: Size(double.infinity, 50),
+            SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : () => _proceedToCheckout(total),
+                child: _isLoading
+                    ? SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text('Proceed to Checkout'),
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _updateQuantity(String productId, int quantity) async {
+    try {
+      await _cartService.updateQuantity(productId, quantity);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update quantity'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeItem(String productId) async {
+    try {
+      await _cartService.removeFromCart(productId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Item removed from cart'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to remove item'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<bool> _showRemoveItemDialog() async {
+    return await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Remove Item'),
+          content: Text('Are you sure you want to remove this item from your cart?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Remove'),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ],
+        );
+      },
+    ) ??
+        false;
+  }
+
+  Future<void> _showClearCartDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Clear Cart'),
+        content: Text('Are you sure you want to remove all items from your cart?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Clear'),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _cartService.clearCart();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cart cleared'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to clear cart'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _proceedToCheckout(double total) async {
+    setState(() => _isLoading = true);
+    try {
+      // TODO: Implement checkout logic
+      await Future.delayed(Duration(seconds: 2)); // Simulate API call
+      Navigator.pushNamed(context, '/checkout');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to proceed to checkout'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 }

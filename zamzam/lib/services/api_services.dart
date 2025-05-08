@@ -12,6 +12,9 @@ class Product {
   double rating;
   int ratingCount;
   bool isFeatured;
+  String? docId;
+  int id;           // Add numerical ID
+  int stockCount;   // Add stock count
 
   Product({
     required this.name,
@@ -22,11 +25,18 @@ class Product {
     this.rating = 0.0,
     this.ratingCount = 0,
     this.isFeatured = false,
+    this.docId,
+    required this.id,        // Add this
+    required this.stockCount, // Add this
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
     // Keep price as is from API
     String priceStr = json['Price'] ?? 'EGP 0.00';
+
+    // Generate a random stock count between 1 and 150
+    final random = DateTime.now().millisecondsSinceEpoch;
+    final stockCount = 1 + (random % 150);
 
     return Product(
       name: json['Name'] ?? 'Unnamed Product',
@@ -34,6 +44,42 @@ class Product {
       image: json['image'] ?? '',
       url: json['url'] ?? '',
       nameUrl: json['Name_url'] ?? '',
+      id: json['id'] ?? 0,  // This will be set later
+      stockCount: stockCount,
+    );
+  }
+  
+  // Add method to convert Product to Map for Firebase
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'price': price,
+      'image': image,
+      'url': url,
+      'nameUrl': nameUrl,
+      'rating': rating,
+      'ratingCount': ratingCount,
+      'isFeatured': isFeatured,
+      'docId': docId,
+      'id': id,
+      'stockCount': stockCount,
+    };
+  }
+  
+  // Add method to create Product from Firebase data
+  factory Product.fromFirebase(Map<String, dynamic> data) {
+    return Product(
+      name: data['name'] ?? 'Unnamed Product',
+      price: data['price'] ?? 'EGP 0.00',
+      image: data['image'] ?? '',
+      url: data['url'] ?? '',
+      nameUrl: data['nameUrl'] ?? '',
+      rating: (data['rating'] ?? 0.0).toDouble(),
+      ratingCount: (data['ratingCount'] ?? 0).toInt(),
+      isFeatured: data['isFeatured'] ?? false,
+      docId: data['docId'],
+      id: data['id'] ?? 0,
+      stockCount: data['stockCount'] ?? 0,
     );
   }
 }
@@ -182,9 +228,11 @@ class ApiService {
   // Helper method to extract price as double from string
   static double _extractPriceValue(String priceString) {
     try {
-      String numericString = priceString.replaceAll(RegExp(r'[^0-9.]'), '');
-      return double.parse(numericString);
+      // Remove 'EGP' and any other non-numeric characters except decimal point
+      String cleanPrice = priceString.replaceAll('EGP', '').replaceAll(RegExp(r'[^0-9.]'), '');
+      return double.parse(cleanPrice);
     } catch (e) {
+      print('Error parsing price: $e');
       return 0.0;
     }
   }
@@ -201,6 +249,8 @@ class ApiService {
               rating: product['rating'],
               ratingCount: product['ratingCount'],
               isFeatured: true,
+              id: 0,
+              stockCount: 0,
             ))
         .toList();
   }

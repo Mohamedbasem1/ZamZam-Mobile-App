@@ -10,6 +10,8 @@ import 'pages/signup_page.dart';
 import 'pages/payment_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/welcome_page.dart';
+import 'pages/admin_page.dart';
+import 'pages/firebase_products_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +60,8 @@ class ZamZamApp extends StatelessWidget {
         '/signup': (context) => SignupPage(),
         '/payment': (context) => PaymentPage(),
         '/profile': (context) => ProfilePage(),
+        '/admin': (context) => AdminPage(),
+        '/firebase-products': (context) => FirebaseProductsPage(),
       },
     );
   }
