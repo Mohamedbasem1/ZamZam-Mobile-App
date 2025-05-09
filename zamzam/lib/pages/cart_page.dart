@@ -471,8 +471,10 @@ class _CartPageState extends State<CartPage> {
   Future<void> _proceedToCheckout(double total) async {
     setState(() => _isLoading = true);
     try {
-      // TODO: Implement checkout logic
-      await Future.delayed(Duration(seconds: 2)); // Simulate API call
+      if (!_firebaseService.isLoggedIn) {
+        Navigator.pushNamed(context, '/login');
+        return;
+      }
       Navigator.pushNamed(context, '/checkout');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

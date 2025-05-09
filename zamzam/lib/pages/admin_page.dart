@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/sync_products.dart';
+import '../services/order_service.dart';
+import '../models/order.dart';
 
 class AdminPage extends StatefulWidget {
   @override
@@ -8,6 +10,7 @@ class AdminPage extends StatefulWidget {
 
 class _AdminPageState extends State<AdminPage> {
   final SyncProductsService _syncService = SyncProductsService();
+  final OrderService _orderService = OrderService();
   bool _isLoading = false;
   String _statusMessage = '';
 
@@ -77,6 +80,13 @@ class _AdminPageState extends State<AdminPage> {
             icon: Icon(Icons.view_list, color: Colors.white),
             label: Text('View Products', style: TextStyle(color: Colors.white)),
           ),
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pushNamed(context, '/make-admin');
+            },
+            icon: Icon(Icons.admin_panel_settings, color: Colors.white),
+            label: Text('Make Admin', style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
       body: Padding(
@@ -84,6 +94,70 @@ class _AdminPageState extends State<AdminPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Orders Overview Card
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Orders Management',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    StreamBuilder<List<ShopOrder>>(
+                      stream: _orderService.getAllOrders(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        }
+
+                        if (snapshot.hasError) {
+                          return Text('Error: ${snapshot.error}');
+                        }
+
+                        final orders = snapshot.data ?? [];
+                        final pendingOrders = orders.where((o) => o.status == 'pending').length;
+                        final processingOrders = orders.where((o) => o.status == 'processing').length;
+                        final shippedOrders = orders.where((o) => o.status == 'shipped').length;
+
+                        return Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _buildOrderStat('Pending', pendingOrders, Colors.orange),
+                                _buildOrderStat('Processing', processingOrders, Colors.blue),
+                                _buildOrderStat('Shipped', shippedOrders, Colors.purple),
+                              ],
+                            ),
+                            SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/admin/orders');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.indigo,
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              child: Text('View All Orders'),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 16),
+
+            // Product Sync Card
             Card(
               elevation: 4,
               child: Padding(
@@ -174,6 +248,36 @@ class _AdminPageState extends State<AdminPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildOrderStat(String label, int count, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            count.toString(),
+            style: TextStyle(
+              color: color,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 } 

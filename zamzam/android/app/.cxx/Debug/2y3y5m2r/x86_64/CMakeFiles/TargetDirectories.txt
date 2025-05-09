@@ -1,0 +1,2 @@
+C:/Users/medob/Desktop/Last semster/Mobile/Project/Moblie_Project_Zamzam/zamzam/android/app/.cxx/Debug/2y3y5m2r/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/medob/Desktop/Last semster/Mobile/Project/Moblie_Project_Zamzam/zamzam/android/app/.cxx/Debug/2y3y5m2r/x86_64/CMakeFiles/rebuild_cache.dir

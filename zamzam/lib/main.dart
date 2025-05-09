@@ -12,6 +12,9 @@ import 'pages/profile_page.dart';
 import 'pages/welcome_page.dart';
 import 'pages/admin_page.dart';
 import 'pages/firebase_products_page.dart';
+import 'pages/checkout_page.dart';
+import 'pages/admin_orders_page.dart';
+import 'pages/make_admin_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +65,9 @@ class ZamZamApp extends StatelessWidget {
         '/profile': (context) => ProfilePage(),
         '/admin': (context) => AdminPage(),
         '/firebase-products': (context) => FirebaseProductsPage(),
+        '/checkout': (context) => CheckoutPage(),
+        '/admin/orders': (context) => AdminOrdersPage(),
+        '/make-admin': (context) => MakeAdminPage(),
       },
     );
   }

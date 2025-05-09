@@ -8,6 +8,18 @@ class FirebaseService {
   // Current user getter
   User? get currentUser => _auth.currentUser;
   bool get isLoggedIn => _auth.currentUser != null;
+  
+  // Admin status getter
+  Future<bool> get isAdmin async {
+    if (!isLoggedIn) return false;
+    try {
+      final doc = await _firestore.collection('users').doc(currentUser!.uid).get();
+      return doc.exists && (doc.data()?['isAdmin'] == true);
+    } catch (e) {
+      print('Error checking admin status: $e');
+      return false;
+    }
+  }
 
   // Auth state changes stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -18,6 +30,7 @@ class FirebaseService {
     required String password,
     required String name,
     String? phone,
+    bool isAdmin = false,
   }) async {
     try {
       print('*** SIGNUP: Creating user for $email ***');
@@ -31,8 +44,7 @@ class FirebaseService {
       // Step 2: Retrieve the user object safely
       User? user = cred.user;
       if (user == null) {
-        print(
-            '*** SIGNUP WARNING: User is null after creation, retrying... ***');
+        print('*** SIGNUP WARNING: User is null after creation, retrying... ***');
         user = _auth.currentUser;
         if (user == null) {
           print('*** SIGNUP ERROR: User is still null after retry ***');
@@ -42,13 +54,22 @@ class FirebaseService {
 
       // Step 3: Save user data to Firestore
       try {
-        await _firestore.collection('users').doc(user.uid).set({
+        final userData = {
           'name': name,
-          'email': email,
+          'email': email.trim().toLowerCase(), // Ensure email is trimmed and lowercase
           'phone': phone ?? '',
           'created_at': FieldValue.serverTimestamp(),
-        });
+          'isAdmin': isAdmin,
+          'uid': user.uid, // Add UID for additional reference
+        };
+        print('*** SIGNUP: Saving user data to Firestore: $userData ***');
+        
+        await _firestore.collection('users').doc(user.uid).set(userData);
         print('*** SIGNUP: Firestore profile saved ***');
+        
+        // Verify the data was saved
+        final savedDoc = await _firestore.collection('users').doc(user.uid).get();
+        print('*** SIGNUP: Verified saved data: ${savedDoc.data()} ***');
       } catch (e) {
         print('*** SIGNUP WARNING: Could not save profile: $e ***');
       }
@@ -147,6 +168,76 @@ class FirebaseService {
     }
   }
 
+  // Set admin status for a user
+  Future<void> setAdminStatus(String userId, bool isAdmin) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'isAdmin': isAdmin,
+      });
+      print('Admin status updated successfully');
+    } catch (e) {
+      print('Error updating admin status: $e');
+      throw Exception('Failed to update admin status');
+    }
+  }
+
+  // Make a user admin by email
+  Future<void> makeUserAdminByEmail(String email) async {
+    try {
+      print('Searching for user with email: $email');
+      // Find user document by email
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email.trim())
+          .get();
+
+      print('Search results count: ${querySnapshot.docs.length}');
+      if (querySnapshot.docs.isEmpty) {
+        print('No user found with email: $email');
+        throw Exception('User not found with email: $email');
+      }
+
+      // Get the first matching document
+      final userDoc = querySnapshot.docs.first;
+      print('Found user document with ID: ${userDoc.id}');
+      print('Current user data: ${userDoc.data()}');
+      
+      // Update admin status
+      await _firestore.collection('users').doc(userDoc.id).update({
+        'isAdmin': true,
+      });
+
+      print('Successfully made $email an admin');
+    } catch (e) {
+      print('Error making user admin: $e');
+      throw Exception('Failed to make user admin: ${e.toString()}');
+    }
+  }
+
+  // Check if a user exists by email
+  Future<bool> checkUserExists(String email) async {
+    try {
+      print('Checking existence for email: $email');
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .get();
+      
+      print('Query result count: ${querySnapshot.docs.length}');
+      if (querySnapshot.docs.isEmpty) {
+        print('No documents found for email: $email');
+      } else {
+        print('Found user document with ID: ${querySnapshot.docs.first.id}');
+        print('User data: ${querySnapshot.docs.first.data()}');
+      }
+      
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking user existence: $e');
+      return false;
+    }
+  }
+
   // Helper method to safely get the current user's ID
   String? getUserId() {
     try {
@@ -154,6 +245,23 @@ class FirebaseService {
     } catch (e) {
       print('Error accessing user ID: $e');
       return null;
+    }
+  }
+
+  // Debug method to list all users
+  Future<void> listAllUsers() async {
+    try {
+      print('*** DEBUG: Listing all users ***');
+      final querySnapshot = await _firestore.collection('users').get();
+      
+      print('Total users found: ${querySnapshot.docs.length}');
+      for (var doc in querySnapshot.docs) {
+        print('User ID: ${doc.id}');
+        print('User Data: ${doc.data()}');
+        print('---');
+      }
+    } catch (e) {
+      print('Error listing users: $e');
     }
   }
 
