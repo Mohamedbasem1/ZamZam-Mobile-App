@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firebase_service.dart';
+import '../services/sync_products.dart'; // Import SyncProductsService
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -9,8 +10,10 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final FirebaseService _firebaseService = FirebaseService();
+  final SyncProductsService _syncProductsService = SyncProductsService(); // Initialize SyncProductsService
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
+  String _syncStatusMessage = '';
 
   @override
   void initState() {
@@ -26,6 +29,28 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
+  Future<void> _syncProducts() async {
+    setState(() {
+      _isLoading = true;
+      _syncStatusMessage = 'Syncing products...';
+    });
+
+    try {
+      await _syncProductsService.syncProductsToFirebase();
+      setState(() {
+        _syncStatusMessage = 'Products synced successfully!';
+      });
+    } catch (e) {
+      setState(() {
+        _syncStatusMessage = 'Error syncing products: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _signOut() async {
     await _firebaseService.signOut();
     Navigator.of(context).pushReplacementNamed('/welcome');
@@ -36,7 +61,6 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('My Profile'),
-        // Replace the default back button with a custom one that navigates to main page
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
           onPressed: () {
@@ -58,19 +82,14 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   // Profile Header
                   Container(
-                    color:
-                        Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
                     padding: EdgeInsets.symmetric(vertical: 24),
                     child: Center(
                       child: Column(
                         children: [
-                          // Profile Avatar
                           CircleAvatar(
                             radius: 50,
-                            backgroundColor: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withOpacity(0.2),
+                            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
                             child: Icon(
                               Icons.person,
                               size: 60,
@@ -78,27 +97,13 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ),
                           SizedBox(height: 16),
-
-                          // User Name
                           Text(
-                            _userData?['name'] ??
-                                _firebaseService.currentUser?.displayName ??
-                                'User',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            _userData?['name'] ?? _firebaseService.currentUser?.displayName ?? 'User',
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                           ),
-
-                          // User Email
                           Text(
-                            _userData?['email'] ??
-                                _firebaseService.currentUser?.email ??
-                                'Email not available',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
+                            _userData?['email'] ?? _firebaseService.currentUser?.email ?? 'Email not available',
+                            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                           ),
                         ],
                       ),
@@ -112,16 +117,14 @@ class _ProfilePageState extends State<ProfilePage> {
                       _buildInfoTile(
                         icon: Icons.badge,
                         title: 'User ID',
-                        subtitle:
-                            _firebaseService.currentUser?.uid ?? 'Unknown',
+                        subtitle: _firebaseService.currentUser?.uid ?? 'Unknown',
                       ),
                       _buildInfoTile(
                         icon: Icons.phone,
                         title: 'Phone Number',
-                        subtitle:
-                            (_userData?['phone'] as String?)?.isNotEmpty == true
-                                ? _userData!['phone']
-                                : 'Not provided',
+                        subtitle: (_userData?['phone'] as String?)?.isNotEmpty == true
+                            ? _userData!['phone']
+                            : 'Not provided',
                       ),
                       _buildInfoTile(
                         icon: Icons.calendar_today,
@@ -139,31 +142,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         icon: Icons.edit,
                         title: 'Edit Profile',
                         onTap: () {
-                          // TODO: Navigate to edit profile page
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Edit Profile coming soon')),
-                          );
-                        },
-                      ),
-                      _buildActionTile(
-                        icon: Icons.location_on,
-                        title: 'Manage Addresses',
-                        onTap: () {
-                          // TODO: Navigate to addresses page
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Manage Addresses coming soon')),
-                          );
-                        },
-                      ),
-                      _buildActionTile(
-                        icon: Icons.lock,
-                        title: 'Change Password',
-                        onTap: () {
-                          // TODO: Navigate to change password page
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Change Password coming soon')),
                           );
                         },
                       ),
@@ -178,93 +158,96 @@ class _ProfilePageState extends State<ProfilePage> {
                         icon: Icons.shopping_bag,
                         title: 'Order History',
                         onTap: () {
-                          // TODO: Navigate to order history page
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Order History coming soon')),
-                          );
+                          Navigator.of(context).pushNamed('/order-history'); // Navigate to Order History Page
                         },
                       ),
                       _buildActionTile(
                         icon: Icons.local_shipping,
                         title: 'Track Current Order',
                         onTap: () {
-                          // TODO: Navigate to order tracking page
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Order Tracking coming soon')),
-                          );
+                          Navigator.of(context).pushNamed('/tracking'); // Navigate to Order Tracking Page
                         },
                       ),
                     ],
                   ),
-                  
+
                   // Admin Section (only visible for admin users)
                   FutureBuilder<bool>(
-                    future: _checkIfAdmin(),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasData && snapshot.data == true) {
-                        return _buildSection(
-                          title: 'Admin Tools',
-                          children: [
-                            _buildActionTile(
-                              icon: Icons.admin_panel_settings,
-                              title: 'Admin Dashboard',
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/admin');
-                              },
+                      future: _checkIfAdmin(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          // Show a loading indicator while checking admin status
+                          return Center(child: CircularProgressIndicator());
+                        }
+                        if (snapshot.hasData && snapshot.data == true) {
+                          // Show the "Admin Tools" section if the user is an admin
+                          return _buildSection(
+                            title: 'Admin Tools',
+                            children: [
+                              _buildActionTile(
+                                icon: Icons.admin_panel_settings,
+                                title: 'Admin Dashboard',
+                                onTap: () {
+                                  Navigator.of(context).pushNamed('/admin');
+                                },
+                              ),
+                              _buildActionTile(
+                                icon: Icons.sync,
+                                title: 'Sync Products',
+                                onTap: _syncProducts, // Call the sync method
+                              ),
+                            ],
+                          );
+                        } else if (snapshot.hasError) {
+                          // Handle errors during the admin check
+                          return Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              'Error checking admin status: ${snapshot.error}',
+                              style: TextStyle(color: Colors.red),
                             ),
-                            _buildActionTile(
-                              icon: Icons.sync,
-                              title: 'Sync Products',
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/admin');
-                              },
+                          );
+                        } else {
+                          // If the user is not an admin, show nothing
+                          return SizedBox.shrink();
+                        }
+                      },
+                    ),
+
+                  // Sync Status Message
+                  if (_syncStatusMessage.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Card(
+                        color: _syncStatusMessage.contains('Error') ? Colors.red[100] : Colors.green[100],
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            _syncStatusMessage,
+                            style: TextStyle(
+                              color: _syncStatusMessage.contains('Error') ? Colors.red[900] : Colors.green[900],
                             ),
-                          ],
-                        );
-                      } else {
-                        return SizedBox.shrink();
-                      }
-                    },
-                  ),
+                          ),
+                        ),
+                      ),
+                    ),
 
                   // App Settings
                   _buildSection(
                     title: 'App Settings',
                     children: [
                       _buildActionTile(
-                        icon: Icons.notifications,
-                        title: 'Notification Preferences',
-                        onTap: () {
-                          // TODO: Navigate to notifications settings
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content:
-                                    Text('Notification Settings coming soon')),
-                          );
-                        },
-                      ),
-                      _buildActionTile(
                         icon: Icons.language,
                         title: 'Language',
                         onTap: () {
-                          // TODO: Navigate to language settings
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Language Settings coming soon')),
-                          );
+                          Navigator.of(context).pushNamed('/language');
                         },
                       ),
                       _buildActionTile(
                         icon: Icons.help,
                         title: 'Help & Support',
                         onTap: () {
-                          // TODO: Navigate to help center
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Help & Support coming soon')),
-                          );
+                          Navigator.of(context).pushNamed('/help');
                         },
                       ),
                     ],
@@ -292,8 +275,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildSection(
-      {required String title, required List<Widget> children}) {
+  Widget _buildSection({required String title, required List<Widget> children}) {
     return Container(
       margin: EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -355,20 +337,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<bool> _checkIfAdmin() async {
     try {
-      // For development purposes, always return true to access admin features
-      // In production, you should implement proper admin role checking
-      return true;
-      
-      // Example of proper implementation:
-      // final user = _firebaseService.currentUser;
-      // if (user == null) return false;
-      // 
-      // DocumentSnapshot userDoc = await FirebaseFirestore.instance
-      //     .collection('users')
-      //     .doc(user.uid)
-      //     .get();
-      // 
-      // return userDoc.exists && userDoc.get('isAdmin') == true;
+      return await _firebaseService.isCurrentUserAdmin();
     } catch (e) {
       print('Error checking admin status: $e');
       return false;

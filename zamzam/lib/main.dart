@@ -15,6 +15,12 @@ import 'pages/firebase_products_page.dart';
 import 'pages/checkout_page.dart';
 import 'pages/admin_orders_page.dart';
 import 'pages/make_admin_page.dart';
+import 'pages/list_users_page.dart'; // Import the ListUsersPage
+import 'services/firebase_service.dart';
+import 'pages/language_settings_page.dart';
+import 'pages/help_support_page.dart';
+import 'pages/order_history_page.dart';
+import 'pages/tracking_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +50,8 @@ void main() async {
 }
 
 class ZamZamApp extends StatelessWidget {
+  final FirebaseService _firebaseService = FirebaseService();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -63,11 +71,38 @@ class ZamZamApp extends StatelessWidget {
         '/signup': (context) => SignupPage(),
         '/payment': (context) => PaymentPage(),
         '/profile': (context) => ProfilePage(),
-        '/admin': (context) => AdminPage(),
         '/firebase-products': (context) => FirebaseProductsPage(),
         '/checkout': (context) => CheckoutPage(),
-        '/admin/orders': (context) => AdminOrdersPage(),
-        '/make-admin': (context) => MakeAdminPage(),
+        '/admin': (context) => _buildAdminRoute(context, AdminPage()),
+        '/make-admin': (context) => _buildAdminRoute(context, MakeAdminPage()),
+        '/admin/orders': (context) => _buildAdminRoute(context, AdminOrdersPage()), // Update Orders Page
+        '/list-users': (context) => _buildAdminRoute(context, ListUsersPage()),
+        '/language': (context) => LanguageSettingsPage(),
+        '/help': (context) => HelpSupportPage(), // View All Users Page
+        '/order-history': (context) => OrderHistoryPage(),
+        '/tracking': (context) => TrackingPage(),
+      },
+    );
+  }
+
+  Widget _buildAdminRoute(BuildContext context, Widget page) {
+    return FutureBuilder<bool>(
+      future: _firebaseService.isCurrentUserAdmin(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasData && snapshot.data == true) {
+          return page;
+        }
+
+        return Scaffold(
+          appBar: AppBar(title: Text('Access Denied')),
+          body: Center(child: Text('You do not have permission to access this page.')),
+        );
       },
     );
   }

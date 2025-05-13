@@ -9,17 +9,6 @@ class FirebaseService {
   User? get currentUser => _auth.currentUser;
   bool get isLoggedIn => _auth.currentUser != null;
   
-  // Admin status getter
-  Future<bool> get isAdmin async {
-    if (!isLoggedIn) return false;
-    try {
-      final doc = await _firestore.collection('users').doc(currentUser!.uid).get();
-      return doc.exists && (doc.data()?['isAdmin'] == true);
-    } catch (e) {
-      print('Error checking admin status: $e');
-      return false;
-    }
-  }
 
   // Auth state changes stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -168,52 +157,6 @@ class FirebaseService {
     }
   }
 
-  // Set admin status for a user
-  Future<void> setAdminStatus(String userId, bool isAdmin) async {
-    try {
-      await _firestore.collection('users').doc(userId).update({
-        'isAdmin': isAdmin,
-      });
-      print('Admin status updated successfully');
-    } catch (e) {
-      print('Error updating admin status: $e');
-      throw Exception('Failed to update admin status');
-    }
-  }
-
-  // Make a user admin by email
-  Future<void> makeUserAdminByEmail(String email) async {
-    try {
-      print('Searching for user with email: $email');
-      // Find user document by email
-      final querySnapshot = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: email.trim())
-          .get();
-
-      print('Search results count: ${querySnapshot.docs.length}');
-      if (querySnapshot.docs.isEmpty) {
-        print('No user found with email: $email');
-        throw Exception('User not found with email: $email');
-      }
-
-      // Get the first matching document
-      final userDoc = querySnapshot.docs.first;
-      print('Found user document with ID: ${userDoc.id}');
-      print('Current user data: ${userDoc.data()}');
-      
-      // Update admin status
-      await _firestore.collection('users').doc(userDoc.id).update({
-        'isAdmin': true,
-      });
-
-      print('Successfully made $email an admin');
-    } catch (e) {
-      print('Error making user admin: $e');
-      throw Exception('Failed to make user admin: ${e.toString()}');
-    }
-  }
-
   // Check if a user exists by email
   Future<bool> checkUserExists(String email) async {
     try {
@@ -249,19 +192,15 @@ class FirebaseService {
   }
 
   // Debug method to list all users
-  Future<void> listAllUsers() async {
+  Future<QuerySnapshot> listAllUsers() async {
     try {
       print('*** DEBUG: Listing all users ***');
-      final querySnapshot = await _firestore.collection('users').get();
-      
+      final querySnapshot = await _firestore.collection('admins').get();
       print('Total users found: ${querySnapshot.docs.length}');
-      for (var doc in querySnapshot.docs) {
-        print('User ID: ${doc.id}');
-        print('User Data: ${doc.data()}');
-        print('---');
-      }
+      return querySnapshot;
     } catch (e) {
       print('Error listing users: $e');
+      throw Exception('Failed to list users');
     }
   }
 
@@ -286,6 +225,60 @@ class FirebaseService {
         return 'Email/password accounts are not enabled';
       default:
         return errorCode;
+    }
+  }
+
+  // Get user ID by email
+  
+
+  // Update a user to admin status
+  Future<void> updateUserToAdmin(String email, String name) async {
+    try {
+      print('Attempting to update user to admin: $email');
+
+      // Check if the email exists in the 'users' collection
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email.trim())
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        throw Exception('User not found in Firestore with email: $email');
+      }
+
+      // Add the user to the 'admins' collection
+      await _firestore.collection('admins').doc(email.trim()).set({
+        'email': email.trim(),
+        'name': name.trim(),
+        'isadmin': true,
+      });
+
+      print('Successfully added $email to the admins collection.');
+    } catch (e) {
+      print('Error adding user to admins collection: $e');
+      throw Exception('Failed to add user to admins collection.');
+    }
+  }
+
+  // Check if the current user is an admin
+  Future<bool> isCurrentUserAdmin() async {
+    if (currentUser == null) return false;
+
+    try {
+      // Check the 'admins' collection for the current user's email
+      final querySnapshot = await _firestore
+          .collection('admins')
+          .where('email', isEqualTo: currentUser!.email)
+          .limit(1)
+          .get();
+
+      // Check if a matching document exists and if 'isadmin' is true
+      return querySnapshot.docs.isNotEmpty &&
+          (querySnapshot.docs.first.data()['isadmin'] == true);
+    } catch (e) {
+      print('Error checking admin status: $e');
+      return false;
     }
   }
 }

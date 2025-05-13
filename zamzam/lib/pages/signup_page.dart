@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firebase_service.dart';
 
 class SignupPage extends StatefulWidget {
@@ -63,7 +64,7 @@ class _SignupPageState extends State<SignupPage> {
     });
 
     try {
-      // Use updated method that returns bool
+      // Use the FirebaseService to create the user in Firebase Authentication
       bool success = await _firebaseService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -71,18 +72,26 @@ class _SignupPageState extends State<SignupPage> {
         phone: _phoneController.text.trim(),
       );
 
-      // Only navigate if successful and mounted
-      if (success && mounted) {
-        // Success - navigate back to login
-        Navigator.of(context).pop();
+      if (success) {
+        // Save the user's email to the Firestore 'users' collection
+        final email = _emailController.text.trim();
 
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Account created successfully! Please sign in.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        await FirebaseFirestore.instance.collection('users').add({
+          'email': email,
+        });
+
+        // Navigate back to the login page
+        if (mounted) {
+          Navigator.of(context).pop();
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Account created successfully! Please sign in.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
       // Show error message

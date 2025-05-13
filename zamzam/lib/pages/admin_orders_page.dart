@@ -20,10 +20,18 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
   }
 
   Future<void> _checkAdminStatus() async {
-    final isAdmin = await _firebaseService.isAdmin;
-    setState(() {
-      _isAdmin = isAdmin;
-    });
+    try {
+      // Use the FirebaseService function to check if the current user is an admin
+      final isAdmin = await _firebaseService.isCurrentUserAdmin();
+      setState(() {
+        _isAdmin = isAdmin;
+      });
+    } catch (e) {
+      setState(() {
+        _isAdmin = false;
+      });
+      print('Error checking admin status: $e');
+    }
   }
 
   String _getStatusColor(String status) {
@@ -184,4 +192,4 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
       ),
     );
   }
-} 
+}

@@ -11,51 +11,37 @@ class MakeAdminPage extends StatefulWidget {
 class _MakeAdminPageState extends State<MakeAdminPage> {
   final FirebaseService _firebaseService = FirebaseService();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
   bool _isLoading = false;
   String _message = '';
 
   @override
-  void initState() {
-    super.initState();
-    _emailController.text = 'fdsfsdf@gmail.com'; // Pre-fill the email
-  }
-
-  @override
   void dispose() {
     _emailController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
   Future<void> _makeAdmin() async {
     final email = _emailController.text.trim();
-    if (email.isEmpty) {
+    final name = _nameController.text.trim();
+
+    if (email.isEmpty || name.isEmpty) {
       setState(() {
-        _message = 'Please enter an email address';
+        _message = 'Please enter both email and name';
       });
       return;
     }
 
     setState(() {
       _isLoading = true;
-      _message = 'Checking user existence...';
+      _message = 'Updating user to admin status...';
     });
 
     try {
-      // First check if user exists
-      final userExists = await _firebaseService.checkUserExists(email);
-      if (!userExists) {
-        setState(() {
-          _isLoading = false;
-          _message = 'Error: User not found. Please make sure the user has signed up first.';
-        });
-        return;
-      }
+      // Use the FirebaseService function to update the user to admin
+      await _firebaseService.updateUserToAdmin(email, name);
 
-      setState(() {
-        _message = 'Making $email an admin...';
-      });
-
-      await _firebaseService.makeUserAdminByEmail(email);
       setState(() {
         _message = 'Successfully made $email an admin!';
       });
@@ -94,6 +80,17 @@ class _MakeAdminPageState extends State<MakeAdminPage> {
                 enabled: !_isLoading,
               ),
               SizedBox(height: 20),
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person),
+                ),
+                keyboardType: TextInputType.text,
+                enabled: !_isLoading,
+              ),
+              SizedBox(height: 20),
               if (_isLoading)
                 CircularProgressIndicator()
               else
@@ -122,27 +119,10 @@ class _MakeAdminPageState extends State<MakeAdminPage> {
                 },
                 child: Text('Back'),
               ),
-              // Debug section
-              Divider(height: 40),
-              Text('Debug Tools', style: TextStyle(color: Colors.grey)),
-              SizedBox(height: 10),
-              TextButton.icon(
-                onPressed: () async {
-                  setState(() {
-                    _message = 'Listing all users...';
-                  });
-                  await _firebaseService.listAllUsers();
-                  setState(() {
-                    _message = 'Check debug console for user list';
-                  });
-                },
-                icon: Icon(Icons.bug_report),
-                label: Text('List All Users'),
-              ),
             ],
           ),
         ),
       ),
     );
   }
-} 
+}

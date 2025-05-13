@@ -1,0 +1,2 @@
+C:/Users/youss_kk115ax/Desktop/Mobile Programming/Moblie Project/ZamZam-Mobile-App/zamzam/android/app/.cxx/Debug/5n172q3p/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/youss_kk115ax/Desktop/Mobile Programming/Moblie Project/ZamZam-Mobile-App/zamzam/android/app/.cxx/Debug/5n172q3p/arm64-v8a/CMakeFiles/rebuild_cache.dir
