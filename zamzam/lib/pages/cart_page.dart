@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/cart_service.dart';
 import '../services/firebase_service.dart';
 import '../widgets/quantity_selector.dart';
-
+//MOstafa
 class CartPage extends StatefulWidget {
   final Function(int)? onNavigate;
 
