@@ -114,6 +114,63 @@ class _AdminPageState extends State<AdminPage> {
                 ),
               ),
             ),
+                        // Products Control Section
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Products Management',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/add_product');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          ),
+                          child: Text('Add'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/delete_product');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            textStyle: TextStyle(color: Colors.white),
+                            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          ),
+                          child: Text('Delete'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/update_product');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            textStyle: TextStyle(color: Colors.white),
+                            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          ),
+                          child: Text('Update'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
             SizedBox(height: 16),
 
             // Status Message

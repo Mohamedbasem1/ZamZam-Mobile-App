@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:convert'; // For base64 encoding
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:typed_data';
 
 class AddProductPage extends StatefulWidget {
   @override
@@ -22,7 +23,7 @@ class _AddProductPageState extends State<AddProductPage> {
   int? _ratingCount;
   int? _stockCount;
   bool _isFeatured = false;
-  File? _imageFile;
+  XFile? _imageFile;
 
   // Image picker
   final ImagePicker _picker = ImagePicker();
@@ -31,7 +32,7 @@ class _AddProductPageState extends State<AddProductPage> {
     final pickedFile = await _picker.pickImage(source: source);
     if (pickedFile != null) {
       setState(() {
-        _imageFile = File(pickedFile.path);
+        _imageFile = pickedFile; // <-- FIX: assign XFile directly
       });
     }
   }
@@ -181,11 +182,23 @@ class _AddProductPageState extends State<AddProductPage> {
                 SizedBox(height: 16),
                 _imageFile == null
                     ? Text('No image selected')
-                    : Image.file(
-                        _imageFile!,
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                    : FutureBuilder<Uint8List>(
+                        future: _imageFile!.readAsBytes(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.done &&
+                              snapshot.hasData) {
+                            return Image.memory(
+                              snapshot.data!,
+                              height: 150,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            );
+                          } else if (snapshot.hasError) {
+                            return Text('Error loading image');
+                          } else {
+                            return CircularProgressIndicator();
+                          }
+                        },
                       ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,

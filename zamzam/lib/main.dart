@@ -21,6 +21,9 @@ import 'pages/language_settings_page.dart';
 import 'pages/help_support_page.dart';
 import 'pages/order_history_page.dart';
 import 'pages/tracking_page.dart';
+import 'pages/add_product.dart';
+import 'pages/delete_product.dart';
+import 'pages/update_product.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -77,6 +80,9 @@ class ZamZamApp extends StatelessWidget {
         '/make-admin': (context) => _buildAdminRoute(context, MakeAdminPage()),
         '/admin/orders': (context) => _buildAdminRoute(context, AdminOrdersPage()), // Update Orders Page
         '/list-users': (context) => _buildAdminRoute(context, ListUsersPage()),
+        '/add_product': (context) => _buildAdminRoute(context, AddProductPage()),
+        '/delete_product': (context) => _buildAdminRoute(context, DeleteProductPage()),
+        '/update_product': (context) => _buildAdminRoute(context, UpdateProductPage()),
         '/language': (context) => LanguageSettingsPage(),
         '/help': (context) => HelpSupportPage(), // View All Users Page
         '/order-history': (context) => OrderHistoryPage(),
