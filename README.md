@@ -4,6 +4,8 @@
 
 ## Overview
 
+> **Note:** This project is developed for a real client and is used in a production environment.
+
 Zamzam is a Flutter-based e-commerce application specializing in premium stationery products. The app provides a seamless shopping experience for users looking to purchase high-quality pens, notebooks, art supplies, and other stationery items.
 
 ## Features
@@ -60,7 +62,7 @@ Zamzam is a Flutter-based e-commerce application specializing in premium station
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/zamzam.git
+   git clone https://github.com/Mohamedbasem1/ZamZam-Mobile-App.git
    ```
 
 2. Navigate to the project directory:
