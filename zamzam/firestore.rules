@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAdmin() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Existing user rules
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Existing wishlist rules
+    match /wishlist/{document} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Products rules
+    match /Products/{productId} {
+      allow read: if true;  // Anyone can read products
+      allow write: if request.auth != null;  // Only authenticated users can write
+    }
+
+    // Featured products rules
+    match /featured_products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Categories rules
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Cart rules
+    match /cart/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Favorites rules
+    match /favorites/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // New Orders rules
+    match /orders/{orderId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.userId || isAdmin()
+      );
+      allow update: if request.auth != null && (
+        // Allow users to update their own orders except status
+        (request.auth.uid == resource.data.userId && 
+         !('status' in request.resource.data)) ||
+        // Allow admins to update everything including status
+        isAdmin()
+      );
+      allow delete: if false; // Prevent order deletion
+    }
+
+    // Default rule (restrict access unless specifically allowed)
+    match /{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+} 
